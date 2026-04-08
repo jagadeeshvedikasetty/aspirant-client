@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 function Quiz() {
   const location = useLocation();
   const navigate = useNavigate();
-  const questions = location.state?.questions || [];
+
+  // useMemo prevents the array from being recreated on every render,
+  // which fixes the react-hooks/exhaustive-deps ESLint error on Vercel CI
+  const questions = useMemo(
+    () => location.state?.questions || [],
+    [location.state]
+  );
 
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -41,10 +47,7 @@ function Quiz() {
     if (current < questions.length - 1) {
       setCurrent((c) => c + 1);
     } else {
-      // Go to result
-      navigate('/result', {
-        state: { questions, answers }
-      });
+      navigate('/result', { state: { questions, answers } });
     }
   };
 
@@ -131,9 +134,7 @@ function Quiz() {
           <button
             className="btn-nav"
             style={{ color: 'var(--warning)', borderColor: 'var(--warning)' }}
-            onClick={() => {
-              setRevealed((prev) => ({ ...prev, [current]: true }));
-            }}
+            onClick={() => setRevealed((prev) => ({ ...prev, [current]: true }))}
           >
             Skip
           </button>
