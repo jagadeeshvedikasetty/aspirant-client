@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubjects, getTopics, getDates, getQuestions } from '../api';
 
-const COUNT_OPTIONS = [5, 10, 15, 20, 25, 30, 50];
-
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -22,7 +20,7 @@ function Home() {
   const [selectedTopic, setSelectedTopic] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [totalAvailable, setTotalAvailable] = useState(0);
-  const [selectedCount, setSelectedCount] = useState(null);
+  const [selectedCount, setSelectedCount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,7 +36,7 @@ function Home() {
       setSelectedDate('');
       setDates([]);
       setTotalAvailable(0);
-      setSelectedCount(null);
+      setSelectedCount('');
       getTopics(selectedSubject).then((r) => setTopics(r.data)).catch(() => {});
     } else {
       setTopics([]);
@@ -49,7 +47,7 @@ function Home() {
     if (selectedTopic) {
       setSelectedDate('');
       setTotalAvailable(0);
-      setSelectedCount(null);
+      setSelectedCount('');
       getDates(selectedTopic).then((r) => setDates(r.data)).catch(() => {});
     } else {
       setDates([]);
@@ -61,7 +59,7 @@ function Home() {
       try {
         const res = await getQuestions({ topic: selectedTopic, date: selectedDate });
         setTotalAvailable(res.data.length);
-        setSelectedCount(null);
+        setSelectedCount('');
       } catch {
         setTotalAvailable(0);
       }
@@ -70,10 +68,29 @@ function Home() {
 
   useEffect(() => { fetchCount(); }, [fetchCount]);
 
-  const availableCounts = COUNT_OPTIONS.filter((c) => c <= totalAvailable);
+  const handleCountChange = (e) => {
+    const val = e.target.value;
+    // Allow empty string (user clearing input)
+    if (val === '') {
+      setSelectedCount('');
+      return;
+    }
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && num >= 1 && num <= totalAvailable) {
+      setSelectedCount(num);
+    } else if (!isNaN(num) && num > totalAvailable) {
+      setSelectedCount(totalAvailable);
+    }
+  };
+
+  const handleSelectAll = () => {
+    setSelectedCount(totalAvailable);
+  };
+
+  const isValidCount = typeof selectedCount === 'number' && selectedCount >= 1 && selectedCount <= totalAvailable;
 
   const handleStart = async () => {
-    if (!selectedCount) { setError('Please select how many questions to attempt'); return; }
+    if (!isValidCount) { setError('Please enter how many questions to attempt'); return; }
     setLoading(true);
     setError('');
     try {
@@ -168,42 +185,35 @@ function Home() {
             <label className="form-label" style={{ display: 'block', marginBottom: 10 }}>
               How many questions? ({totalAvailable} available)
             </label>
-            <div className="count-grid">
-              {availableCounts.length > 0 ? (
-                availableCounts.map((c) => (
-                  <button
-                    key={c}
-                    className={`count-btn${selectedCount === c ? ' active' : ''}`}
-                    onClick={() => setSelectedCount(c)}
-                  >
-                    {c}
-                  </button>
-                ))
-              ) : (
-                <button
-                  className={`count-btn${selectedCount === totalAvailable ? ' active' : ''}`}
-                  onClick={() => setSelectedCount(totalAvailable)}
-                >
-                  {totalAvailable}
-                </button>
-              )}
-              {/* Custom all option */}
-              {totalAvailable > 0 && !COUNT_OPTIONS.includes(totalAvailable) && (
-                <button
-                  className={`count-btn${selectedCount === totalAvailable ? ' active' : ''}`}
-                  onClick={() => setSelectedCount(totalAvailable)}
-                >
-                  All ({totalAvailable})
-                </button>
-              )}
+            <div className="count-input-row">
+              <input
+                type="number"
+                className="form-control count-input"
+                min={1}
+                max={totalAvailable}
+                value={selectedCount}
+                onChange={handleCountChange}
+                placeholder={`Enter 1 – ${totalAvailable}`}
+              />
+              <button
+                className={`count-btn all-btn${selectedCount === totalAvailable ? ' active' : ''}`}
+                onClick={handleSelectAll}
+              >
+                All ({totalAvailable})
+              </button>
             </div>
+            {isValidCount && (
+              <div className="count-feedback">
+                You'll attempt <strong>{selectedCount}</strong> out of <strong>{totalAvailable}</strong> questions
+              </div>
+            )}
           </div>
         )}
 
         <button
           className="btn-start"
           onClick={handleStart}
-          disabled={!selectedCount || loading}
+          disabled={!isValidCount || loading}
         >
           {loading ? 'Loading...' : `Start Practice →`}
         </button>
@@ -213,3 +223,4 @@ function Home() {
 }
 
 export default Home;
+

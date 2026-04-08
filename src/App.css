@@ -184,6 +184,48 @@ body {
   box-shadow: 0 0 16px var(--accent-glow);
 }
 
+/* Count input row */
+.count-input-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 4px;
+}
+.count-input {
+  flex: 1;
+  max-width: 260px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  /* Remove browser default number input spinners */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.count-input::-webkit-outer-spin-button,
+.count-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.all-btn {
+  white-space: nowrap;
+  padding: 11px 20px;
+}
+.count-feedback {
+  margin-top: 10px;
+  font-size: 0.84rem;
+  color: var(--text2);
+  padding: 8px 14px;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.count-feedback strong {
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+
 /* Start button */
 .btn-start {
   width: 100%;
