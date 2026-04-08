@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const BASE_URL =
+  process.env.REACT_APP_API_URL || 'https://aspirant-server.vercel.app/api';
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = axios.create({ baseURL: BASE_URL, timeout: 15000 });
 
 export const getSubjects = () => api.get('/subjects');
 export const getTopics = (subjectId) =>
