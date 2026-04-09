@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 
 function Result() {
   const location = useLocation();
@@ -95,7 +96,10 @@ function Result() {
                 <strong style={{ color: 'var(--text2)', fontFamily: 'JetBrains Mono', fontSize: '0.78rem' }}>
                   Q{idx + 1}.{' '}
                 </strong>
-                {q.questionText}
+                <span
+                  className="rich-content"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q.questionText) }}
+                />
               </div>
               <div className="review-answers">
                 {isSkipped ? (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 
 function Quiz() {
   const location = useLocation();
@@ -86,7 +87,7 @@ function Quiz() {
 
       <div className="question-card">
         <div className="question-num">Q{current + 1}</div>
-        <div className="question-text">{q.questionText}</div>
+        <div className="question-text rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q.questionText) }} />
         <div className="options-list">
           {q.options.map((opt, idx) => (
             <button

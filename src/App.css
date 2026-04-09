@@ -300,6 +300,48 @@ body {
   margin-bottom: 24px;
 }
 
+/* ── Rich Content (rendered HTML in questions) ── */
+.rich-content p { margin: 0 0 8px; }
+.rich-content p:last-child { margin-bottom: 0; }
+.rich-content ol, .rich-content ul { padding-left: 1.5em; margin: 8px 0; }
+.rich-content li { margin-bottom: 4px; }
+.rich-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  font-size: 0.95rem;
+}
+.rich-content table th,
+.rich-content table td {
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  text-align: left;
+}
+.rich-content table th {
+  background: var(--surface2);
+  color: var(--text2);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.rich-content table tr:nth-child(even) td {
+  background: rgba(255,255,255,0.02);
+}
+.rich-content blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 14px;
+  color: var(--text2);
+  margin: 8px 0;
+  font-style: italic;
+}
+.rich-content strong { font-weight: 700; }
+.rich-content em { font-style: italic; }
+.rich-content u { text-decoration: underline; }
+
+.review-q .rich-content { display: inline; }
+.review-q .rich-content p { display: inline; }
+
 .options-list { display: flex; flex-direction: column; gap: 12px; }
 .option-btn {
   align-items: center;
