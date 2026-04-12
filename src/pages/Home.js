@@ -21,6 +21,8 @@ function Home() {
   const [selectedDate, setSelectedDate] = useState('');
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [selectedCount, setSelectedCount] = useState('');
+  const [timerHours, setTimerHours] = useState(1);
+  const [timerMinutes, setTimerMinutes] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -88,9 +90,12 @@ function Home() {
   };
 
   const isValidCount = typeof selectedCount === 'number' && selectedCount >= 1 && selectedCount <= totalAvailable;
+  const timerSeconds = timerHours * 3600 + timerMinutes * 60;
+  const isTimerValid = timerSeconds > 0;
 
   const handleStart = async () => {
     if (!isValidCount) { setError('Please enter how many questions to attempt'); return; }
+    if (!isTimerValid) { setError('Please set a timer duration'); return; }
     setLoading(true);
     setError('');
     try {
@@ -116,7 +121,7 @@ function Home() {
         };
       });
 
-      navigate('/quiz', { state: { questions: preparedQuestions } });
+      navigate('/quiz', { state: { questions: preparedQuestions, timerSeconds } });
     } catch {
       setError('Failed to load questions. Try again.');
       setLoading(false);
@@ -210,12 +215,53 @@ function Home() {
           </div>
         )}
 
+        {/* Timer Duration Selector */}
+        {isValidCount && (
+          <div className="timer-selector">
+            <label className="form-label" style={{ display: 'block', marginBottom: 10 }}>
+              ⏱ Timer Duration
+            </label>
+            <div className="timer-inputs-row">
+              <div className="timer-input-group">
+                <select
+                  className="form-control timer-select"
+                  value={timerHours}
+                  onChange={(e) => setTimerHours(parseInt(e.target.value, 10))}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span className="timer-unit">Hours</span>
+              </div>
+              <span className="timer-colon">:</span>
+              <div className="timer-input-group">
+                <select
+                  className="form-control timer-select"
+                  value={timerMinutes}
+                  onChange={(e) => setTimerMinutes(parseInt(e.target.value, 10))}
+                >
+                  {Array.from({ length: 60 }, (_, i) => i).map((m) => (
+                    <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                  ))}
+                </select>
+                <span className="timer-unit">Minutes</span>
+              </div>
+            </div>
+            {isTimerValid && (
+              <div className="count-feedback" style={{ marginTop: 10 }}>
+                Quiz timer: <strong>{timerHours > 0 ? `${timerHours}h ` : ''}{timerMinutes > 0 ? `${timerMinutes}m` : timerHours > 0 ? '' : '0m'}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           className="btn-start"
           onClick={handleStart}
-          disabled={!isValidCount || loading}
+          disabled={!isValidCount || !isTimerValid || loading}
         >
-          {loading ? 'Loading...' : `Start Practice →`}
+          {loading ? 'Loading...' : `Start Exam →`}
         </button>
       </div>
     </div>
@@ -223,4 +269,3 @@ function Home() {
 }
 
 export default Home;
-
