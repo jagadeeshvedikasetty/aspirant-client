@@ -128,31 +128,105 @@ function Quiz() {
 
   return (
     <div className="exam-wrapper">
-      {/* Top Bar */}
+      {/* Top Bar: Nav Buttons + Timer — always fixed at top */}
       <div className="exam-topbar">
-        <div className="exam-topbar-left">
-          <div className={getTimerClass()}>
-            <span className="timer-icon">⏱</span>
-            <span className="timer-value">{formatTime(timeLeft)}</span>
-            <button className="timer-toggle-btn" onClick={togglePause}>
-              {isPaused ? '▶' : '⏸'}
-            </button>
-          </div>
+        <div className="exam-topbar-center">
+          <button
+            className="btn-topbar btn-prev"
+            onClick={handlePrev}
+            disabled={current === 0}
+          >
+            Previous
+          </button>
+          <button
+            className={`btn-topbar btn-review${marked[current] ? ' btn-review-active' : ''}`}
+            onClick={handleMarkForReview}
+          >
+            Mark for Review
+          </button>
+          <button
+            className="btn-topbar btn-save-next"
+            onClick={handleSaveNext}
+            disabled={current === questions.length - 1}
+          >
+            Save &amp; Next
+          </button>
+          <button
+            className="btn-topbar btn-submit-top"
+            onClick={handleSubmit}
+          >
+            Submit
+          </button>
         </div>
         <div className="exam-topbar-right">
-          <div className="exam-stat-chip">
-            Answered: <strong>{answeredCount}</strong> / {questions.length}
+          <div className="topbar-info-stack">
+            <div className={getTimerClass()}>
+              <span className="timer-label">Time Left:</span>
+              <span className="timer-value">{formatTime(timeLeft)}</span>
+            </div>
+            <button className="pause-test-btn" onClick={togglePause}>
+              {isPaused ? '▶ Resume Test' : '⏸ Pause Test'}
+            </button>
+            <div className="total-answered-chip">
+              Total Questions answered : <strong>{answeredCount}</strong>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main 2-column Layout */}
+      {/* Main 2-column Layout: Sidebar LEFT, Question RIGHT */}
       <div className="exam-layout">
-        {/* LEFT: Question Area */}
+        {/* LEFT: Sidebar — fixed, no scroll needed */}
+        <div className="exam-sidebar">
+          {/* Question Navigator */}
+          <div className="sidebar-section sidebar-navigator">
+            <h3 className="sidebar-title">General Intelligence :</h3>
+            <div className="question-grid-scroll">
+              <div className="question-grid">
+                {questions.map((_, idx) => (
+                  <button
+                    key={idx}
+                    className={`grid-cell ${getQuestionStatus(idx)}${idx === current ? ' current' : ''}`}
+                    onClick={() => handleJumpTo(idx)}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Analytics Panel */}
+          <div className="sidebar-section analytics-panel">
+            <h3 className="sidebar-title analytics-title-bar">General Intelligence Analytics</h3>
+            <table className="analytics-table">
+              <tbody>
+                <tr>
+                  <td className="analytics-label">Answered</td>
+                  <td className="analytics-value answered-val">{answeredCount}</td>
+                </tr>
+                <tr>
+                  <td className="analytics-label">Not Answered</td>
+                  <td className="analytics-value not-answered-val">{notAnsweredCount}</td>
+                </tr>
+                <tr>
+                  <td className="analytics-label">Marked</td>
+                  <td className="analytics-value marked-val">{markedCount}</td>
+                </tr>
+                <tr>
+                  <td className="analytics-label">Answered Marked</td>
+                  <td className="analytics-value">{answeredMarkedCount}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* RIGHT: Question Area — only this part scrolls */}
         <div className="exam-question-area">
           <div className="question-card">
             <div className="question-num">
-              Question {current + 1} of {questions.length}
+              Question No {current + 1}
               {marked[current] && <span className="mark-indicator">▲ Marked</span>}
             </div>
             <div
@@ -171,102 +245,6 @@ function Quiz() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Navigation Bar */}
-          <div className="exam-nav-bar">
-            <button
-              className="btn-nav"
-              onClick={handlePrev}
-              disabled={current === 0}
-            >
-              ← Previous
-            </button>
-            <button
-              className={`btn-nav${marked[current] ? ' btn-marked-active' : ' btn-mark'}`}
-              onClick={handleMarkForReview}
-            >
-              {marked[current] ? '★ Unmark' : '☆ Mark for Review'}
-            </button>
-            <button
-              className="btn-nav primary"
-              onClick={handleSaveNext}
-              disabled={current === questions.length - 1}
-            >
-              Save & Next →
-            </button>
-            <button
-              className="btn-nav btn-submit"
-              onClick={handleSubmit}
-            >
-              Submit
-            </button>
-          </div>
-        </div>
-
-        {/* RIGHT: Sidebar */}
-        <div className="exam-sidebar">
-          {/* Question Number Grid */}
-          <div className="sidebar-section">
-            <h3 className="sidebar-title">Question Navigator</h3>
-            <div className="question-grid">
-              {questions.map((_, idx) => (
-                <button
-                  key={idx}
-                  className={`grid-cell ${getQuestionStatus(idx)}${idx === current ? ' current' : ''}`}
-                  onClick={() => handleJumpTo(idx)}
-                >
-                  {idx + 1}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="sidebar-section">
-            <div className="grid-legend">
-              <div className="legend-item">
-                <span className="legend-dot answered"></span> Answered
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot not-answered"></span> Not Answered
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot marked"></span> Marked
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot not-visited"></span> Not Visited
-              </div>
-            </div>
-          </div>
-
-          {/* Analytics Panel */}
-          <div className="sidebar-section analytics-panel">
-            <h3 className="sidebar-title">Analytics</h3>
-            <table className="analytics-table">
-              <tbody>
-                <tr>
-                  <td className="analytics-label">Answered</td>
-                  <td className="analytics-value answered-val">{answeredCount}</td>
-                </tr>
-                <tr>
-                  <td className="analytics-label">Not Answered</td>
-                  <td className="analytics-value not-answered-val">{notAnsweredCount}</td>
-                </tr>
-                <tr>
-                  <td className="analytics-label">Marked for Review</td>
-                  <td className="analytics-value marked-val">{markedCount}</td>
-                </tr>
-                <tr>
-                  <td className="analytics-label">Answered & Marked</td>
-                  <td className="analytics-value">{answeredMarkedCount}</td>
-                </tr>
-                <tr className="analytics-total-row">
-                  <td className="analytics-label"><strong>Total</strong></td>
-                  <td className="analytics-value"><strong>{questions.length}</strong></td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
