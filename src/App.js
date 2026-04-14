@@ -11,9 +11,9 @@ function AppLayout() {
   const isQuizPage = location.pathname === '/quiz';
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${isQuizPage ? ' quiz-active' : ''}`}>
       <Navbar />
-      <main className="app-main" style={isQuizPage ? { maxWidth: '1400px' } : {}}>
+      <main className={`app-main${isQuizPage ? ' quiz-main' : ''}`} style={isQuizPage ? { maxWidth: '100%' } : {}}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/quiz" element={<Quiz />} />
