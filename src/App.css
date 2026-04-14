@@ -371,7 +371,7 @@ body {
 /* Timer — centered block with boxed digits */
 .exam-topbar-timer-wrap {
   position: absolute;
-  left: 50%;
+  left: calc(50% + 130px);
   transform: translateX(-50%);
 }
 
@@ -459,7 +459,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 16px;
+  padding: 5px 16px 5px 276px; /* Shift by 260px to center over question area */
   background: #e0f2f1;
   border-bottom: 2px solid #80cbc4;
   flex-shrink: 0;
@@ -467,26 +467,26 @@ body {
 
 .action-buttons-group {
   display: flex;
-  gap: 0;
+  gap: 12px;
 }
 
 .btn-topbar {
   font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  padding: 8px 18px;
-  border: 1px solid #37474f;
+  padding: 8px 16px;
+  border: none;
+  background-color: #4A7AF2;
   color: #fff;
   transition: all 0.15s;
-  letter-spacing: 0.2px;
-  border-radius: 0;
+  border-radius: 2px;
   white-space: nowrap;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
-.btn-topbar:hover {
-  filter: brightness(1.1);
+.btn-topbar:hover:not(:disabled) {
+  background-color: #3b6bd6;
 }
 
 .btn-topbar:disabled {
@@ -494,38 +494,8 @@ body {
   cursor: not-allowed;
 }
 
-.btn-review {
-  background: #1565c0;
-  border-color: #0d47a1;
-  border-radius: 4px 0 0 4px;
-}
-
-.btn-review:hover:not(:disabled) {
-  background: #0d47a1;
-}
-
 .btn-review-active {
-  background: #7b1fa2 !important;
-  border-color: #6a1b9a !important;
-}
-
-.btn-save-next {
-  background: #2e7d32;
-  border-color: #1b5e20;
-}
-
-.btn-save-next:hover:not(:disabled) {
-  background: #1b5e20;
-}
-
-.btn-submit-top {
-  background: #c62828;
-  border-color: #b71c1c;
-  border-radius: 0 4px 4px 0;
-}
-
-.btn-submit-top:hover:not(:disabled) {
-  background: #b71c1c;
+  background-color: #7b1fa2 !important;
 }
 
 /* ── EXAM LAYOUT (2-column: sidebar LEFT, question RIGHT) ── */
