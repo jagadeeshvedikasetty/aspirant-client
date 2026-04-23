@@ -212,11 +212,6 @@ function Home() {
                 <div className="test-card-header">
                   <h3 className="test-card-name">{test.name}</h3>
                 </div>
-                <div className="test-card-subjects">
-                  {test.subjects.map((s) => (
-                    <span key={s._id} className="test-subject-badge">{s.name}</span>
-                  ))}
-                </div>
                 <div className="test-card-info">
                   <div className="test-info-item">
                     <span className="test-info-icon">📋</span>
