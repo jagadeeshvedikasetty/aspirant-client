@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Quiz from './pages/Quiz';
 import Result from './pages/Result';
+import CurrentAffairs from './pages/CurrentAffairs';
 
 function AppLayout() {
   const location = useLocation();
@@ -18,6 +19,7 @@ function AppLayout() {
           <Route path="/" element={<Home />} />
           <Route path="/quiz" element={<Quiz />} />
           <Route path="/result" element={<Result />} />
+          <Route path="/current-affairs" element={<CurrentAffairs />} />
         </Routes>
       </main>
     </div>

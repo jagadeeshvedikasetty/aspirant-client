@@ -11,3 +11,10 @@ export const getTopics = (subjectId) =>
 export const getQuestions = (params) => api.get('/questions', { params });
 export const getDates = (topicId) =>
   api.get('/questions/dates', { params: { topic: topicId } });
+
+// Tests
+export const getTests = () => api.get('/tests');
+export const generateTest = (testId) => api.get(`/tests/${testId}/generate`);
+
+// Current Affairs
+export const getCurrentAffairs = (params) => api.get('/current-affairs', { params });
