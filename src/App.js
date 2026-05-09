@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
@@ -10,6 +10,22 @@ import CurrentAffairs from './pages/CurrentAffairs';
 function AppLayout() {
   const location = useLocation();
   const isQuizPage = location.pathname === '/quiz';
+
+  /* ── Prevent browser zoom (desktop + mobile) ── */
+  useEffect(() => {
+    const blockWheel = (e) => { if (e.ctrlKey) e.preventDefault(); };
+    const blockKeys = (e) => {
+      if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('wheel', blockWheel, { passive: false });
+    document.addEventListener('keydown', blockKeys);
+    return () => {
+      document.removeEventListener('wheel', blockWheel);
+      document.removeEventListener('keydown', blockKeys);
+    };
+  }, []);
 
   return (
     <div className={`app-layout${isQuizPage ? ' quiz-active' : ''}`}>
