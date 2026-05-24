@@ -9,6 +9,19 @@ function Quiz() {
   const navigate = useNavigate();
 
   // Try to restore questions from sessionStorage on refresh, fallback to location.state
+  const testId = useMemo(() => {
+    const fromState = location.state?.testId;
+    if (fromState) return fromState;
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.testId || null;
+      }
+    } catch {}
+    return null;
+  }, [location.state]);
+
   const questions = useMemo(() => {
     const fromState = location.state?.questions;
     if (fromState && fromState.length > 0) return fromState;
@@ -74,6 +87,7 @@ function Quiz() {
       const stateToSave = {
         questions,
         initialTimerSeconds,
+        testId,
         current,
         answers,
         visited,
@@ -104,8 +118,8 @@ function Quiz() {
   const handleSubmit = useCallback(() => {
     // Clear saved state on submit
     sessionStorage.removeItem(STORAGE_KEY);
-    navigate('/result', { state: { questions, answers } });
-  }, [navigate, questions, answers]);
+    navigate('/result', { state: { questions, answers, testId } });
+  }, [navigate, questions, answers, testId]);
 
   useEffect(() => {
     if (timeLeft === 0 && questions.length > 0) {

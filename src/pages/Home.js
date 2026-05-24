@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubjects, getTopics, getDates, getQuestions, getTests, generateTest } from '../api';
 
+const MARKS_KEY_PREFIX = 'aspirant_marks_';
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -30,6 +32,12 @@ function Home() {
   const [tests, setTests] = useState([]);
   const [testsLoading, setTestsLoading] = useState(true);
   const [startingTestId, setStartingTestId] = useState(null);
+
+  // Mode picker modal state
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [modalTestId, setModalTestId] = useState(null);
+  const [modalMarks, setModalMarks] = useState({ '1x': [], '2x': [] });
+  const [modalTestName, setModalTestName] = useState('');
 
   useEffect(() => {
     getSubjects()
@@ -145,12 +153,43 @@ function Home() {
     }
   };
 
-  // Start a mock test
-  const handleStartTest = async (testId) => {
+  // Start a mock test — check for marks first
+  const handleStartTest = (testId) => {
+    setError('');
+    try {
+      const saved = localStorage.getItem(`${MARKS_KEY_PREFIX}${testId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const has1x = parsed['1x'] && parsed['1x'].length > 0;
+        const has2x = parsed['2x'] && parsed['2x'].length > 0;
+        if (has1x || has2x) {
+          // Show mode picker modal
+          const test = tests.find((t) => t._id === testId);
+          setModalTestId(testId);
+          setModalMarks(parsed);
+          setModalTestName(test?.name || 'Test');
+          setShowModeModal(true);
+          return;
+        }
+      }
+    } catch {}
+    // No marks — start immediately in normal mode
+    startTestWithMode(testId, 'normal', []);
+  };
+
+  // Handle mode selection from modal
+  const handleModeSelect = (mode) => {
+    setShowModeModal(false);
+    const markedIds = mode === '1x' ? modalMarks['1x'] : mode === '2x' ? modalMarks['2x'] : [];
+    startTestWithMode(modalTestId, mode, markedIds);
+  };
+
+  // Shared function to start a test with a given mode
+  const startTestWithMode = async (testId, mode, markedQuestionIds) => {
     setStartingTestId(testId);
     setError('');
     try {
-      const res = await generateTest(testId);
+      const res = await generateTest(testId, { mode, markedQuestionIds });
       const { questions, timerSeconds: testTimer } = res.data;
 
       if (!questions || questions.length === 0) {
@@ -175,7 +214,7 @@ function Home() {
         };
       });
 
-      navigate('/quiz', { state: { questions: preparedQuestions, timerSeconds: testTimer } });
+      navigate('/quiz', { state: { questions: preparedQuestions, timerSeconds: testTimer, testId } });
     } catch {
       setError('Failed to generate test. Try again.');
       setStartingTestId(null);
@@ -374,6 +413,55 @@ function Home() {
           {loading ? 'Loading...' : `Start Exam →`}
         </button>
       </div>
+      {/* Mode Picker Modal */}
+      {showModeModal && (
+        <div className="mode-modal-overlay" onClick={() => setShowModeModal(false)}>
+          <div className="mode-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mode-modal-header">
+              <h3 className="mode-modal-title">Choose Practice Mode</h3>
+              <p className="mode-modal-sub">{modalTestName}</p>
+            </div>
+            <div className="mode-modal-body">
+              <p className="mode-modal-desc">
+                You have marked questions for this test. How would you like to practice?
+              </p>
+              <div className="mode-options">
+                <button
+                  className="mode-option-btn mode-normal"
+                  onClick={() => handleModeSelect('normal')}
+                >
+                  <span className="mode-icon">🎲</span>
+                  <span className="mode-label">Normal</span>
+                  <span className="mode-desc">Fully random questions</span>
+                </button>
+                {modalMarks['1x'].length > 0 && (
+                  <button
+                    className="mode-option-btn mode-1x"
+                    onClick={() => handleModeSelect('1x')}
+                  >
+                    <span className="mode-icon">🔁</span>
+                    <span className="mode-label">1x Practice</span>
+                    <span className="mode-desc">{modalMarks['1x'].length} marked questions + random fill</span>
+                  </button>
+                )}
+                {modalMarks['2x'].length > 0 && (
+                  <button
+                    className="mode-option-btn mode-2x"
+                    onClick={() => handleModeSelect('2x')}
+                  >
+                    <span className="mode-icon">🔥</span>
+                    <span className="mode-label">2x Practice</span>
+                    <span className="mode-desc">{modalMarks['2x'].length} marked questions + random fill</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <button className="mode-modal-close" onClick={() => setShowModeModal(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

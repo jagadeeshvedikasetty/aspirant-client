@@ -14,7 +14,7 @@ export const getDates = (topicId) =>
 
 // Tests
 export const getTests = () => api.get('/tests');
-export const generateTest = (testId) => api.get(`/tests/${testId}/generate`);
+export const generateTest = (testId, body = {}) => api.post(`/tests/${testId}/generate`, body);
 
 // Current Affairs
 export const getCurrentAffairs = (params) => api.get('/current-affairs', { params });
