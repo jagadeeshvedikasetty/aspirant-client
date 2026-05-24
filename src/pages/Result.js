@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
+
+const MARKS_KEY_PREFIX = 'aspirant_marks_';
 
 function Result() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { questions = [], answers = {} } = location.state || {};
+  const { questions = [], answers = {}, testId } = location.state || {};
+
+  // Load marks from localStorage
+  const [marks, setMarks] = useState(() => {
+    if (!testId) return { '1x': [], '2x': [] };
+    try {
+      const saved = localStorage.getItem(`${MARKS_KEY_PREFIX}${testId}`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { '1x': [], '2x': [] };
+  });
+
+  // Persist marks to localStorage whenever they change
+  useEffect(() => {
+    if (!testId) return;
+    localStorage.setItem(`${MARKS_KEY_PREFIX}${testId}`, JSON.stringify(marks));
+  }, [marks, testId]);
 
   if (questions.length === 0) {
     navigate('/', { replace: true });
@@ -41,6 +59,38 @@ function Result() {
     if (userAns === undefined) return 'review-card skipped-card';
     if (userAns === questions[idx].correctOption) return 'review-card correct-card';
     return 'review-card wrong-card';
+  };
+
+  // Toggle mark for a question
+  const toggleMark = (questionId, level) => {
+    setMarks((prev) => {
+      const other = level === '1x' ? '2x' : '1x';
+      const isCurrentlyMarked = prev[level].includes(questionId);
+
+      let newLevel;
+      if (isCurrentlyMarked) {
+        // Unmark — toggle off
+        newLevel = prev[level].filter((id) => id !== questionId);
+      } else {
+        // Mark — add to this level
+        newLevel = [...prev[level], questionId];
+      }
+
+      // Always remove from the other level (a question can only be 1x OR 2x)
+      const newOther = prev[other].filter((id) => id !== questionId);
+
+      return {
+        ...prev,
+        [level]: newLevel,
+        [other]: newOther,
+      };
+    });
+  };
+
+  const getMarkState = (questionId) => {
+    if (marks['1x'].includes(questionId)) return '1x';
+    if (marks['2x'].includes(questionId)) return '2x';
+    return null;
   };
 
   return (
@@ -90,16 +140,38 @@ function Result() {
           const userAns = answers[idx];
           const isCorrect = userAns === q.correctOption;
           const isSkipped = userAns === undefined;
+          const markState = getMarkState(q._id);
           return (
             <div key={q._id || idx} className={getReviewClass(idx)}>
-              <div className="review-q">
-                <strong style={{ color: 'var(--text2)', fontFamily: 'JetBrains Mono', fontSize: '0.78rem' }}>
-                  Q{idx + 1}.{' '}
-                </strong>
-                <span
-                  className="rich-content"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q.questionText) }}
-                />
+              <div className="review-q-header">
+                <div className="review-q">
+                  <strong style={{ color: 'var(--text2)', fontFamily: 'JetBrains Mono', fontSize: '0.78rem' }}>
+                    Q{idx + 1}.{' '}
+                  </strong>
+                  <span
+                    className="rich-content"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q.questionText) }}
+                  />
+                </div>
+                {/* 1x / 2x Mark Buttons — only show for mock tests (when testId exists) */}
+                {testId && (
+                  <div className="mark-buttons">
+                    <button
+                      className={`mark-btn mark-1x ${markState === '1x' ? 'active' : ''}`}
+                      onClick={() => toggleMark(q._id, '1x')}
+                      title="Mark for 1x practice"
+                    >
+                      1x
+                    </button>
+                    <button
+                      className={`mark-btn mark-2x ${markState === '2x' ? 'active' : ''}`}
+                      onClick={() => toggleMark(q._id, '2x')}
+                      title="Mark for 2x (hard) practice"
+                    >
+                      2x
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="review-answers">
                 {isSkipped ? (
