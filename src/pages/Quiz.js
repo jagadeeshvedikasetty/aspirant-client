@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 
 const STORAGE_KEY = 'aspirant_quiz_state';
+const MOBILE_BREAKPOINT = 768;
 
 function Quiz() {
   const location = useLocation();
@@ -54,7 +55,6 @@ function Quiz() {
       const saved = sessionStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Only restore if questions match (same quiz session)
         if (parsed.questions && parsed.questions.length === questions.length) {
           return parsed;
         }
@@ -68,7 +68,23 @@ function Quiz() {
   const [visited, setVisited] = useState(savedState?.visited || { 0: true });
   const [marked, setMarked] = useState(savedState?.marked || {});
   const [timeLeft, setTimeLeft] = useState(savedState?.timeLeft ?? initialTimerSeconds);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const timerRef = useRef(null);
+
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= MOBILE_BREAKPOINT);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerView, setDrawerView] = useState('grid'); // 'grid' or 'list'
+
+  // Detect mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+      if (window.innerWidth > MOBILE_BREAKPOINT) setDrawerOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setVisited(prev => ({ ...prev, [current]: true }));
@@ -101,7 +117,6 @@ function Quiz() {
   // Timer
   useEffect(() => {
     if (questions.length === 0) return;
-
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -111,12 +126,10 @@ function Quiz() {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timerRef.current);
   }, [questions.length]);
 
   const handleSubmit = useCallback(() => {
-    // Clear saved state on submit
     sessionStorage.removeItem(STORAGE_KEY);
     navigate('/result', { state: { questions, answers, testId } });
   }, [navigate, questions, answers, testId]);
@@ -126,6 +139,21 @@ function Quiz() {
       handleSubmit();
     }
   }, [timeLeft, questions.length, handleSubmit]);
+
+  // Fullscreen toggle
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullScreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullScreen(false)).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFSChange);
+    return () => document.removeEventListener('fullscreenchange', handleFSChange);
+  }, []);
 
   if (questions.length === 0) return null;
 
@@ -137,9 +165,15 @@ function Quiz() {
     setAnswers(prev => ({ ...prev, [current]: idx }));
   };
 
+  const handleClearResponse = () => {
+    setAnswers(prev => {
+      const updated = { ...prev };
+      delete updated[current];
+      return updated;
+    });
+  };
+
   const handleSaveNext = () => {
-    // BUG FIX: Clear "marked" flag when saving an answered question
-    // so palette turns green instead of staying yellow
     if (answers[current] !== undefined && marked[current]) {
       setMarked(prev => {
         const updated = { ...prev };
@@ -147,7 +181,6 @@ function Quiz() {
         return updated;
       });
     }
-
     if (current < questions.length - 1) {
       const next = current + 1;
       setCurrent(next);
@@ -157,7 +190,6 @@ function Quiz() {
 
   const handleMarkAndNext = () => {
     setMarked(prev => ({ ...prev, [current]: true }));
-
     if (current < questions.length - 1) {
       const next = current + 1;
       setCurrent(next);
@@ -168,17 +200,16 @@ function Quiz() {
   const handleJumpTo = (idx) => {
     setCurrent(idx);
     setVisited(prev => ({ ...prev, [idx]: true }));
+    if (isMobile) setDrawerOpen(false);
   };
 
   // ================= STATS =================
 
   const answeredCount = Object.keys(answers).length;
-
-  const notAnsweredCount = Object.keys(visited).filter(
-    k => answers[k] === undefined
-  ).length;
-
+  const notAnsweredCount = Object.keys(visited).filter(k => answers[k] === undefined).length;
   const markedCount = Object.keys(marked).filter(k => marked[k]).length;
+  const markedAndAnsweredCount = Object.keys(marked).filter(k => marked[k] && answers[k] !== undefined).length;
+  const notVisitedCount = questions.length - Object.keys(visited).length;
 
   // ================= HELPERS =================
 
@@ -201,27 +232,213 @@ function Quiz() {
 
   const time = formatTime(timeLeft);
 
-  // Auto-fit: compute question font scale based on text length
   const questionLen = q.questionText ? q.questionText.length : 0;
   const qFontSize = questionLen > 800 ? '0.78rem'
     : questionLen > 500 ? '0.85rem'
     : questionLen > 300 ? '0.92rem'
     : '1rem';
 
-  // ================= UI =================
+  // Question status helper
+  const getStatus = (i) => {
+    if (marked[i] && answers[i] !== undefined) return 'marked-answered';
+    if (marked[i]) return 'marked';
+    if (answers[i] !== undefined) return 'answered';
+    if (visited[i]) return 'not-answered';
+    return 'not-visited';
+  };
+
+  // ================= MOBILE UI =================
+
+  if (isMobile) {
+    return (
+      <div className="m-exam-wrapper">
+        {/* MOBILE TOP BAR */}
+        <div className="m-topbar">
+          <div className="m-topbar-timer">
+            <span className="m-timer-text">{time.h}:{time.m}:{time.s}</span>
+          </div>
+          <button className="m-hamburger" onClick={() => setDrawerOpen(true)}>
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+
+        {/* MOBILE QUESTION AREA */}
+        <div className="m-question-area">
+          <div className="m-question-badge">{current + 1}</div>
+
+          <div
+            className="m-question-text rich-content"
+            style={{ fontSize: qFontSize }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q.questionText) }}
+          />
+
+          <div className="m-options-list">
+            {q.options.map((opt, idx) => (
+              <div
+                key={idx}
+                className={`m-option-card ${answers[current] === idx ? 'selected' : ''}`}
+                onClick={() => handleOption(idx)}
+              >
+                <span className="m-option-num">{idx + 1}.</span>
+                <span
+                  className="m-option-text rich-content"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(opt) }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* MOBILE BOTTOM BAR */}
+        <div className="m-bottom-bar">
+          <button className="m-btn m-btn-mark" onClick={handleMarkAndNext}>
+            Mark &amp; Next
+          </button>
+          <button className="m-btn m-btn-clear" onClick={handleClearResponse}>
+            Clear
+          </button>
+          <button className="m-btn m-btn-save" onClick={handleSaveNext}>
+            Save &amp; Next
+          </button>
+        </div>
+
+        {/* DRAWER OVERLAY */}
+        {drawerOpen && (
+          <div className="m-drawer-overlay" onClick={() => setDrawerOpen(false)} />
+        )}
+
+        {/* MOBILE DRAWER */}
+        <div className={`m-drawer ${drawerOpen ? 'open' : ''}`}>
+          {/* Drawer tabs */}
+          <div className="m-drawer-tabs">
+            <button
+              className={`m-drawer-tab ${drawerView === 'grid' ? 'active' : ''}`}
+              onClick={() => setDrawerView('grid')}
+            >
+              Grid View
+            </button>
+            <button
+              className={`m-drawer-tab ${drawerView === 'list' ? 'active' : ''}`}
+              onClick={() => setDrawerView('list')}
+            >
+              List View
+            </button>
+          </div>
+
+          {/* Drawer content */}
+          <div className="m-drawer-body">
+            {/* Legend */}
+            <div className="m-drawer-legend">
+              <div className="m-legend-row">
+                <span className="m-legend-item">
+                  <span className="m-legend-dot marked-dot">★</span>
+                  Marked for Review
+                </span>
+                <span className="m-legend-item">
+                  <span className="m-legend-dot unattempted-dot"></span>
+                  Unattempted
+                </span>
+              </div>
+              <div className="m-legend-row">
+                <span className="m-legend-item">
+                  <span className="m-legend-dot unseen-dot"></span>
+                  Unseen
+                </span>
+                <span className="m-legend-item">
+                  <span className="m-legend-dot attempted-dot"></span>
+                  Attempted
+                </span>
+              </div>
+            </div>
+
+            {/* Test section */}
+            <div className="m-drawer-section">
+              <div className="m-drawer-section-header">
+                <span className="m-section-title">Test</span>
+              </div>
+
+              {/* Status summary */}
+              <div className="m-status-summary">
+                <span className="m-status-item">
+                  <span className="m-legend-dot marked-dot small">★</span> {markedCount}
+                </span>
+                <span className="m-status-item">
+                  <span className="m-legend-dot attempted-dot small"></span> {answeredCount}
+                </span>
+                <span className="m-status-item">
+                  <span className="m-legend-dot unattempted-dot small"></span> {notAnsweredCount}
+                </span>
+                <span className="m-status-item">
+                  <span className="m-legend-dot unseen-dot small"></span> {notVisitedCount}
+                </span>
+              </div>
+
+              {/* Grid or List view */}
+              {drawerView === 'grid' ? (
+                <div className="m-grid-view">
+                  {questions.map((_, i) => {
+                    const status = getStatus(i);
+                    return (
+                      <div
+                        key={i}
+                        className={`m-grid-cell ${status} ${current === i ? 'current' : ''}`}
+                        onClick={() => handleJumpTo(i)}
+                      >
+                        {i + 1}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="m-list-view">
+                  {questions.map((q, i) => {
+                    const status = getStatus(i);
+                    return (
+                      <div
+                        key={i}
+                        className={`m-list-item ${status} ${current === i ? 'current' : ''}`}
+                        onClick={() => handleJumpTo(i)}
+                      >
+                        <div className={`m-list-num ${status}`}>{i + 1}</div>
+                        <div
+                          className="m-list-text rich-content"
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(
+                              (q.questionText || '').length > 100
+                                ? q.questionText.substring(0, 100) + '...'
+                                : q.questionText
+                            )
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Submit button at bottom of drawer */}
+          <div className="m-drawer-footer">
+            <button className="m-btn-submit" onClick={handleSubmit}>
+              SUBMIT TEST
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ================= DESKTOP UI =================
 
   return (
     <div className="exam-wrapper">
 
       {/* TOPBAR */}
       <div className="exam-topbar">
-        {/* Left: Question Number */}
-        <div className="exam-topbar-left">
-          <span className="topbar-qnum">Question No. {current + 1}</span>
-        </div>
+        <div className="exam-topbar-left"></div>
 
-        {/* Center: Timer */}
-        <div className="exam-topbar-timer-wrap">
+        <div className="exam-topbar-center">
           <div className={getTimerClass()}>
             <span className="timer-label">Time Left</span>
             <div className="timer-boxes">
@@ -234,30 +451,9 @@ function Quiz() {
           </div>
         </div>
 
-        {/* Right: Total Answered */}
         <div className="exam-topbar-right">
-          <div className="total-answered-chip">
-            Total Questions Answered: <strong>{answeredCount}</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* ACTION BUTTONS BAR */}
-      <div className="exam-action-bar">
-        <div className="action-buttons-group">
-          <button
-            className={`btn-topbar btn-review ${marked[current] ? 'btn-review-active' : ''}`}
-            onClick={handleMarkAndNext}
-          >
-            Mark for Review &amp; Next
-          </button>
-
-          <button className="btn-topbar btn-save-next" onClick={handleSaveNext}>
-            Save &amp; Next
-          </button>
-
-          <button className="btn-topbar btn-submit-top" onClick={handleSubmit}>
-            Submit Test
+          <button className="btn-fullscreen" onClick={toggleFullScreen}>
+            {isFullScreen ? 'Exit Full Screen' : 'Switch Full Screen'}
           </button>
         </div>
       </div>
@@ -265,59 +461,7 @@ function Quiz() {
       {/* MAIN LAYOUT */}
       <div className="exam-layout">
 
-        {/* SIDEBAR */}
-        <div className="exam-sidebar">
-          {/* DIV 1: General Intelligence — scrollable question grid */}
-          <div className="sidebar-section sidebar-navigator">
-            <h3 className="sidebar-title">General Intelligence</h3>
-
-            <div className="question-grid-scroll">
-              <div className="question-grid">
-                {questions.map((_, i) => {
-                  let status = 'not-visited';
-
-                  if (marked[i]) status = 'marked';
-                  else if (answers[i] !== undefined) status = 'answered';
-                  else if (visited[i]) status = 'not-answered';
-
-                  return (
-                    <div
-                      key={i}
-                      className={`grid-cell ${status} ${current === i ? 'current' : ''}`}
-                      onClick={() => handleJumpTo(i)}
-                    >
-                      {i + 1}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* DIV 2: PART-A Analysis — pinned at bottom */}
-          <div className="sidebar-section analytics-panel">
-            <h3 className="sidebar-title analytics-title-bar">PART-A Analysis</h3>
-
-            <table className="analytics-table">
-              <tbody>
-                <tr>
-                  <td className="analytics-label">Answered</td>
-                  <td className="analytics-value answered-val">{answeredCount}</td>
-                </tr>
-                <tr>
-                  <td className="analytics-label">Not Answered</td>
-                  <td className="analytics-value not-answered-val">{notAnsweredCount}</td>
-                </tr>
-                <tr>
-                  <td className="analytics-label">Marked for Review</td>
-                  <td className="analytics-value marked-val">{markedCount}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* QUESTION AREA */}
+        {/* QUESTION AREA (LEFT) */}
         <div className="exam-question-area">
           <div className="question-card">
             <div className="question-num">
@@ -357,7 +501,82 @@ function Quiz() {
           </div>
         </div>
 
+        {/* SIDEBAR (RIGHT) */}
+        <div className="exam-sidebar">
+          <div className="sidebar-legend">
+            <div className="legend-row">
+              <span className="legend-item">
+                <span className="legend-badge answered-badge">{answeredCount}</span>
+                Answered
+              </span>
+              <span className="legend-item">
+                <span className="legend-badge marked-badge">{markedCount}</span>
+                Marked
+              </span>
+              <span className="legend-item">
+                <span className="legend-badge not-visited-badge">{notVisitedCount}</span>
+                Not Visited
+              </span>
+            </div>
+            <div className="legend-row">
+              <span className="legend-item">
+                <span className="legend-badge marked-answered-badge">{markedAndAnsweredCount}</span>
+                Marked and answered
+              </span>
+              <span className="legend-item not-answered-legend">
+                <span className="legend-count-red">{notAnsweredCount}</span>
+                Not Answered
+              </span>
+            </div>
+          </div>
+
+          <div className="sidebar-section sidebar-navigator">
+            <div className="question-grid-scroll">
+              <div className="question-grid">
+                {questions.map((_, i) => {
+                  const status = getStatus(i);
+                  return (
+                    <div
+                      key={i}
+                      className={`grid-cell ${status} ${current === i ? 'current' : ''}`}
+                      onClick={() => handleJumpTo(i)}
+                    >
+                      {i + 1}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      {/* BOTTOM ACTION BAR */}
+      <div className="exam-action-bar">
+        <div className="action-bar-left">
+          <button
+            className={`btn-action btn-mark-review ${marked[current] ? 'btn-review-active' : ''}`}
+            onClick={handleMarkAndNext}
+          >
+            Mark for Review &amp; Next
+          </button>
+          <button className="btn-action btn-clear" onClick={handleClearResponse}>
+            Clear Response
+          </button>
+        </div>
+        <div className="action-bar-center">
+          <button className="btn-action btn-save-next" onClick={handleSaveNext}>
+            Save &amp; Next
+          </button>
+        </div>
+        <div className="action-bar-right">
+          <button className="btn-action btn-submit" onClick={handleSubmit}>
+            Submit Test
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }

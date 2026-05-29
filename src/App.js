@@ -29,7 +29,7 @@ function AppLayout() {
 
   return (
     <div className={`app-layout${isQuizPage ? ' quiz-active' : ''}`}>
-      <Navbar />
+      {!isQuizPage && <Navbar />}
       <main className={`app-main${isQuizPage ? ' quiz-main' : ''}`} style={isQuizPage ? { maxWidth: '100%' } : {}}>
         <Routes>
           <Route path="/" element={<Home />} />
