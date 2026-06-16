@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Clock, ClipboardList, ArrowRight } from 'lucide-react';
 import { getSubjects, getTopics, getDates, getQuestions, getTests, generateTest } from '../api';
+import CustomDropdown from '../components/CustomDropdown';
+import MockTestCard from '../components/MockTestCard';
+import { enrichTestsWithTopics } from '../utils/testTopics';
 
 const MARKS_KEY_PREFIX = 'aspirant_marks_';
 
@@ -28,12 +32,10 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Mock Tests state
   const [tests, setTests] = useState([]);
   const [testsLoading, setTestsLoading] = useState(true);
   const [startingTestId, setStartingTestId] = useState(null);
 
-  // Mode picker modal state
   const [showModeModal, setShowModeModal] = useState(false);
   const [modalTestId, setModalTestId] = useState(null);
   const [modalMarks, setModalMarks] = useState({ '1x': [], '2x': [] });
@@ -45,16 +47,24 @@ function Home() {
       .catch(() => setError('Failed to load subjects'));
   }, []);
 
-  // Fetch active tests
   useEffect(() => {
-    setTestsLoading(true);
-    getTests()
-      .then((r) => {
-        // Only show active tests
-        setTests(r.data.filter((t) => t.isActive));
-      })
-      .catch(() => {})
-      .finally(() => setTestsLoading(false));
+    let cancelled = false;
+
+    async function loadTests() {
+      setTestsLoading(true);
+      try {
+        const res = await getTests();
+        const enriched = await enrichTestsWithTopics(res.data, getTopics);
+        if (!cancelled) setTests(enriched);
+      } catch {
+        if (!cancelled) setTests([]);
+      } finally {
+        if (!cancelled) setTestsLoading(false);
+      }
+    }
+
+    loadTests();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -97,7 +107,6 @@ function Home() {
 
   const handleCountChange = (e) => {
     const val = e.target.value;
-    // Allow empty string (user clearing input)
     if (val === '') {
       setSelectedCount('');
       return;
@@ -127,10 +136,8 @@ function Home() {
       const res = await getQuestions({ topic: selectedTopic, date: selectedDate });
       const questions = res.data;
 
-      // Shuffle questions and take selectedCount
       const shuffledQuestions = shuffle(questions).slice(0, selectedCount);
 
-      // Shuffle options within each question, track correct answer text
       const preparedQuestions = shuffledQuestions.map((q) => {
         const optionsWithIndex = q.options.map((text, idx) => ({
           text,
@@ -153,7 +160,6 @@ function Home() {
     }
   };
 
-  // Start a mock test — check for marks first
   const handleStartTest = (testId) => {
     setError('');
     try {
@@ -163,7 +169,6 @@ function Home() {
         const has1x = parsed['1x'] && parsed['1x'].length > 0;
         const has2x = parsed['2x'] && parsed['2x'].length > 0;
         if (has1x || has2x) {
-          // Show mode picker modal
           const test = tests.find((t) => t._id === testId);
           setModalTestId(testId);
           setModalMarks(parsed);
@@ -173,18 +178,15 @@ function Home() {
         }
       }
     } catch {}
-    // No marks — start immediately in normal mode
     startTestWithMode(testId, 'normal', []);
   };
 
-  // Handle mode selection from modal
   const handleModeSelect = (mode) => {
     setShowModeModal(false);
     const markedIds = mode === '1x' ? modalMarks['1x'] : mode === '2x' ? modalMarks['2x'] : [];
     startTestWithMode(modalTestId, mode, markedIds);
   };
 
-  // Shared function to start a test with a given mode
   const startTestWithMode = async (testId, mode, markedQuestionIds) => {
     setStartingTestId(testId);
     setError('');
@@ -198,7 +200,6 @@ function Home() {
         return;
       }
 
-      // Shuffle options within each question
       const preparedQuestions = questions.map((q) => {
         const optionsWithIndex = q.options.map((text, idx) => ({
           text,
@@ -224,60 +225,55 @@ function Home() {
   const formatTimer = (totalSec) => {
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);
-    let parts = [];
+    const parts = [];
     if (h > 0) parts.push(`${h}h`);
     if (m > 0) parts.push(`${m}m`);
     if (parts.length === 0) parts.push(`${totalSec}s`);
     return parts.join(' ');
   };
 
+  const topicOptions = topics.map((t) => ({ value: t._id, label: t.name }));
+  const dateOptions = dates.map((d) => ({ value: d, label: d }));
+  const hourOptions = [0, 1, 2, 3, 4, 5].map((h) => ({ value: h, label: String(h) }));
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => ({
+    value: i,
+    label: String(i).padStart(2, '0'),
+  }));
+
   return (
-    <div>
+    <div className="home-page">
       <div className="home-hero">
-        <h1>Practice Makes<br /><span>Perfect.</span></h1>
+        <h1>
+          Practice Makes<br />
+          <span className="hero-gradient">Perfect.</span>
+        </h1>
         <p>Select your subject, topic and date to start practising</p>
       </div>
 
-      {/* Mock Tests Section */}
       {!testsLoading && tests.length > 0 && (
         <div className="mock-tests-section">
           <div className="section-header">
-            <h2 className="section-title">📝 Mock Tests</h2>
+            <h2 className="section-title">
+              <ClipboardList className="section-title-icon" size={22} strokeWidth={2} />
+              Mock Tests
+            </h2>
             <p className="section-sub">Pre-configured tests created by admin</p>
           </div>
           <div className="test-cards-grid">
-            {tests.map((test) => (
-              <div key={test._id} className="test-card">
-                <div className="test-card-header">
-                  <h3 className="test-card-name">{test.name}</h3>
-                </div>
-                <div className="test-card-info">
-                  <div className="test-info-item">
-                    <span className="test-info-icon">📋</span>
-                    <span>{test.totalQuestions} Questions</span>
-                  </div>
-                  <div className="test-info-item">
-                    <span className="test-info-icon">⏱</span>
-                    <span>
-                      {formatTimer(test.totalQuestions * test.secondsPerQuestion)}
-                      <span className="test-info-detail"> ({test.secondsPerQuestion}s/q)</span>
-                    </span>
-                  </div>
-                </div>
-                <button
-                  className="btn-start-test"
-                  onClick={() => handleStartTest(test._id)}
-                  disabled={startingTestId === test._id}
-                >
-                  {startingTestId === test._id ? 'Loading...' : 'Start Test →'}
-                </button>
-              </div>
+            {tests.map((test, index) => (
+              <MockTestCard
+                key={test._id}
+                test={test}
+                index={index}
+                startingTestId={startingTestId}
+                onStart={handleStartTest}
+                formatTimer={formatTimer}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* Divider */}
       {!testsLoading && tests.length > 0 && (
         <div className="section-divider">
           <span>or practice by topic</span>
@@ -288,55 +284,48 @@ function Home() {
         <h2>Setup Your Quiz</h2>
         {error && <div className="alert alert-error">{error}</div>}
 
-        <div className="setup-grid">
-          <div className="form-group">
-            <label className="form-label">Subject</label>
-            <select
-              className="form-control"
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-            >
-              <option value="">-- Choose Subject --</option>
-              {subjects.map((s) => (
-                <option key={s._id} value={s._id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Topic</label>
-            <select
-              className="form-control"
-              value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              disabled={!selectedSubject}
-            >
-              <option value="">-- Choose Topic --</option>
-              {topics.map((t) => (
-                <option key={t._id} value={t._id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Date</label>
-            <select
-              className="form-control"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              disabled={!selectedTopic}
-            >
-              <option value="">-- Choose Date --</option>
-              {dates.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+        <div className="subject-pills-section">
+          <label className="form-label">Subject</label>
+          <div className="subject-pills">
+            {subjects.map((s) => (
+              <button
+                key={s._id}
+                type="button"
+                className={`subject-pill${selectedSubject === s._id ? ' is-active' : ''}`}
+                onClick={() => setSelectedSubject(selectedSubject === s._id ? '' : s._id)}
+              >
+                {s.name}
+              </button>
+            ))}
+            {subjects.length === 0 && (
+              <span className="subject-pills-empty">Loading subjects...</span>
+            )}
           </div>
         </div>
 
+        <div className="setup-grid">
+          <CustomDropdown
+            label="Topic"
+            value={selectedTopic}
+            options={topicOptions}
+            onChange={setSelectedTopic}
+            disabled={!selectedSubject}
+            placeholder="Choose Topic"
+          />
+
+          <CustomDropdown
+            label="Date"
+            value={selectedDate}
+            options={dateOptions}
+            onChange={setSelectedDate}
+            disabled={!selectedTopic}
+            placeholder="Choose Date"
+          />
+        </div>
+
         {totalAvailable > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <label className="form-label" style={{ display: 'block', marginBottom: 10 }}>
+          <div className="setup-section">
+            <label className="form-label">
               How many questions? ({totalAvailable} available)
             </label>
             <div className="count-input-row">
@@ -350,6 +339,7 @@ function Home() {
                 placeholder={`Enter 1 – ${totalAvailable}`}
               />
               <button
+                type="button"
                 className={`count-btn all-btn${selectedCount === totalAvailable ? ' active' : ''}`}
                 onClick={handleSelectAll}
               >
@@ -364,42 +354,40 @@ function Home() {
           </div>
         )}
 
-        {/* Timer Duration Selector */}
         {isValidCount && (
           <div className="timer-selector">
-            <label className="form-label" style={{ display: 'block', marginBottom: 10 }}>
-              ⏱ Timer Duration
+            <label className="form-label timer-label">
+              <Clock size={15} strokeWidth={2} />
+              Timer Duration
             </label>
             <div className="timer-inputs-row">
               <div className="timer-input-group">
-                <select
-                  className="form-control timer-select"
+                <CustomDropdown
                   value={timerHours}
-                  onChange={(e) => setTimerHours(parseInt(e.target.value, 10))}
-                >
-                  {[0, 1, 2, 3, 4, 5].map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
+                  options={hourOptions}
+                  onChange={(v) => setTimerHours(Number(v))}
+                  placeholder="0"
+                />
                 <span className="timer-unit">Hours</span>
               </div>
               <span className="timer-colon">:</span>
               <div className="timer-input-group">
-                <select
-                  className="form-control timer-select"
+                <CustomDropdown
                   value={timerMinutes}
-                  onChange={(e) => setTimerMinutes(parseInt(e.target.value, 10))}
-                >
-                  {Array.from({ length: 60 }, (_, i) => i).map((m) => (
-                    <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                  ))}
-                </select>
+                  options={minuteOptions}
+                  onChange={(v) => setTimerMinutes(Number(v))}
+                  placeholder="00"
+                />
                 <span className="timer-unit">Minutes</span>
               </div>
             </div>
             {isTimerValid && (
-              <div className="count-feedback" style={{ marginTop: 10 }}>
-                Quiz timer: <strong>{timerHours > 0 ? `${timerHours}h ` : ''}{timerMinutes > 0 ? `${timerMinutes}m` : timerHours > 0 ? '' : '0m'}</strong>
+              <div className="count-feedback">
+                Quiz timer:{' '}
+                <strong>
+                  {timerHours > 0 ? `${timerHours}h ` : ''}
+                  {timerMinutes > 0 ? `${timerMinutes}m` : timerHours > 0 ? '' : '0m'}
+                </strong>
               </div>
             )}
           </div>
@@ -410,10 +398,11 @@ function Home() {
           onClick={handleStart}
           disabled={!isValidCount || !isTimerValid || loading}
         >
-          {loading ? 'Loading...' : `Start Exam →`}
+          <span>{loading ? 'Loading...' : 'Start Exam'}</span>
+          {!loading && <ArrowRight className="btn-start-arrow" size={20} strokeWidth={2.5} />}
         </button>
       </div>
-      {/* Mode Picker Modal */}
+
       {showModeModal && (
         <div className="mode-modal-overlay" onClick={() => setShowModeModal(false)}>
           <div className="mode-modal" onClick={(e) => e.stopPropagation()}>
