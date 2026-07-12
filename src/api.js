@@ -18,3 +18,10 @@ export const generateTest = (testId, body = {}) => api.post(`/tests/${testId}/ge
 
 // Current Affairs
 export const getCurrentAffairs = (params) => api.get('/current-affairs', { params });
+
+// Marks (server-side sync)
+export const getMarks = (testId) => api.get(`/marks/${testId}`);
+export const setMark = (testId, questionId, mark) =>
+  api.put(`/marks/${testId}/${questionId}`, { mark });
+export const removeMark = (testId, questionId) =>
+  api.delete(`/marks/${testId}/${questionId}`);

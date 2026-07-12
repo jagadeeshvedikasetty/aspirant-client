@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
+import { getMarks, setMark, removeMark } from '../api';
 
 const MARKS_KEY_PREFIX = 'aspirant_marks_';
 
@@ -9,21 +10,60 @@ function Result() {
   const navigate = useNavigate();
   const { questions = [], answers = {}, testId } = location.state || {};
 
-  // Load marks from localStorage
-  const [marks, setMarks] = useState(() => {
-    if (!testId) return { '1x': [], '2x': [] };
-    try {
-      const saved = localStorage.getItem(`${MARKS_KEY_PREFIX}${testId}`);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return { '1x': [], '2x': [] };
-  });
+  const [marks, setMarks] = useState({ '1x': [], '2x': [] });
+  const [syncingId, setSyncingId] = useState(null);
 
-  // Persist marks to localStorage whenever they change
+  // Load marks from server on mount, fallback to localStorage
+  const loadMarks = useCallback(async () => {
+    if (!testId) return;
+    try {
+      const res = await getMarks(testId);
+      setMarks(res.data);
+      // Also update localStorage cache
+      localStorage.setItem(`${MARKS_KEY_PREFIX}${testId}`, JSON.stringify(res.data));
+    } catch {
+      // Fallback: try localStorage
+      try {
+        const saved = localStorage.getItem(`${MARKS_KEY_PREFIX}${testId}`);
+        if (saved) setMarks(JSON.parse(saved));
+      } catch {}
+    }
+  }, [testId]);
+
+  useEffect(() => {
+    loadMarks();
+  }, [loadMarks]);
+
+  // Auto-migrate: on first load, if server has no marks but localStorage does, push them to server
   useEffect(() => {
     if (!testId) return;
-    localStorage.setItem(`${MARKS_KEY_PREFIX}${testId}`, JSON.stringify(marks));
-  }, [marks, testId]);
+    const migrateLocalMarks = async () => {
+      try {
+        const res = await getMarks(testId);
+        const serverMarks = res.data;
+        const serverHasMarks = (serverMarks['1x']?.length > 0) || (serverMarks['2x']?.length > 0);
+        if (serverHasMarks) return; // Server already has marks, no migration needed
+
+        const saved = localStorage.getItem(`${MARKS_KEY_PREFIX}${testId}`);
+        if (!saved) return;
+        const localMarks = JSON.parse(saved);
+        const all1x = localMarks['1x'] || [];
+        const all2x = localMarks['2x'] || [];
+        if (all1x.length === 0 && all2x.length === 0) return;
+
+        // Push local marks to server
+        const promises = [
+          ...all1x.map((qId) => setMark(testId, qId, '1x')),
+          ...all2x.map((qId) => setMark(testId, qId, '2x'))
+        ];
+        await Promise.allSettled(promises);
+      } catch {
+        // Migration failed silently — not critical
+      }
+    };
+    migrateLocalMarks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testId]);
 
   if (questions.length === 0) {
     navigate('/', { replace: true });
@@ -61,30 +101,48 @@ function Result() {
     return 'review-card wrong-card';
   };
 
-  // Toggle mark for a question
-  const toggleMark = (questionId, level) => {
-    setMarks((prev) => {
-      const other = level === '1x' ? '2x' : '1x';
-      const isCurrentlyMarked = prev[level].includes(questionId);
+  // Toggle mark for a question — syncs to server + localStorage
+  const toggleMark = async (questionId, level) => {
+    const currentMark = getMarkState(questionId);
+    setSyncingId(questionId);
 
-      let newLevel;
-      if (isCurrentlyMarked) {
-        // Unmark — toggle off
-        newLevel = prev[level].filter((id) => id !== questionId);
+    try {
+      if (currentMark === level) {
+        // Unmark — remove from server
+        await removeMark(testId, questionId);
       } else {
-        // Mark — add to this level
-        newLevel = [...prev[level], questionId];
+        // Set or switch mark on server
+        await setMark(testId, questionId, level);
       }
 
-      // Always remove from the other level (a question can only be 1x OR 2x)
-      const newOther = prev[other].filter((id) => id !== questionId);
+      // Update local state from server
+      const res = await getMarks(testId);
+      setMarks(res.data);
+      // Update localStorage cache
+      localStorage.setItem(`${MARKS_KEY_PREFIX}${testId}`, JSON.stringify(res.data));
+    } catch {
+      // Fallback: update locally if server fails
+      setMarks((prev) => {
+        const other = level === '1x' ? '2x' : '1x';
+        const isCurrentlyMarked = prev[level].includes(questionId);
 
-      return {
-        ...prev,
-        [level]: newLevel,
-        [other]: newOther,
-      };
-    });
+        let newLevel;
+        if (isCurrentlyMarked) {
+          newLevel = prev[level].filter((id) => id !== questionId);
+        } else {
+          newLevel = [...prev[level], questionId];
+        }
+
+        const newOther = prev[other].filter((id) => id !== questionId);
+        const updated = { ...prev, [level]: newLevel, [other]: newOther };
+
+        // Save to localStorage
+        localStorage.setItem(`${MARKS_KEY_PREFIX}${testId}`, JSON.stringify(updated));
+        return updated;
+      });
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   const getMarkState = (questionId) => {
@@ -141,6 +199,7 @@ function Result() {
           const isCorrect = userAns === q.correctOption;
           const isSkipped = userAns === undefined;
           const markState = getMarkState(q._id);
+          const isSyncing = syncingId === q._id;
           return (
             <div key={q._id || idx} className={getReviewClass(idx)}>
               <div className="review-q-header">
@@ -159,16 +218,18 @@ function Result() {
                     <button
                       className={`mark-btn mark-1x ${markState === '1x' ? 'active' : ''}`}
                       onClick={() => toggleMark(q._id, '1x')}
+                      disabled={isSyncing}
                       title="Mark for 1x practice"
                     >
-                      1x
+                      {isSyncing && markState !== '1x' ? '...' : '1x'}
                     </button>
                     <button
                       className={`mark-btn mark-2x ${markState === '2x' ? 'active' : ''}`}
                       onClick={() => toggleMark(q._id, '2x')}
+                      disabled={isSyncing}
                       title="Mark for 2x (hard) practice"
                     >
-                      2x
+                      {isSyncing && markState !== '2x' ? '...' : '2x'}
                     </button>
                   </div>
                 )}
